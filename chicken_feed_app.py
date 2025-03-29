@@ -1,159 +1,107 @@
+
 import streamlit as st
 import pycountry
 import pandas as pd
+import matplotlib.pyplot as plt
 from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import base64
 
 # Feed requirements based on type and age
 feed_data = {
     "Broilers": {
-        "0-2 weeks": {"corn": 50, "soybean": 30, "fishmeal": 20},
-        "3-6 weeks": {"corn": 55, "soybean": 25, "fishmeal": 20},
-        "7+ weeks": {"corn": 60, "soybean": 20, "fishmeal": 20}
+        "Starter (0-4 weeks)": {"corn": 40, "soybean": 25, "rice": 5, "wheat": 5, "fishmeal": 10, "sunflower meal": 5, "limestone": 2, "premix": 5, "salt": 1, "dl_methionine": 1},
+        "Grower (5-12 weeks)": {"corn": 35, "soybean": 20, "rice": 10, "wheat": 10, "fishmeal": 10, "sunflower meal": 10, "limestone": 3, "premix": 5, "salt": 1, "dl_methionine": 1},
+        "Finisher (13+ weeks)": {"corn": 30, "soybean": 15, "rice": 15, "wheat": 15, "fishmeal": 5, "sunflower meal": 10, "limestone": 4, "premix": 5, "salt": 1, "dl_methionine": 1}
     },
     "Layers": {
-        "0-6 weeks": {"corn": 40, "soybean": 35, "fishmeal": 25},
-        "7-16 weeks": {"corn": 45, "soybean": 30, "fishmeal": 25},
-        "17+ weeks": {"corn": 50, "soybean": 30, "fishmeal": 20}
+        "Starter (0-4 weeks)": {"corn": 40, "soybean": 25, "rice": 5, "wheat": 5, "fishmeal": 10, "sunflower meal": 5, "limestone": 2, "premix": 5, "salt": 1, "dl_methionine": 1},
+        "Grower (5-12 weeks)": {"corn": 35, "soybean": 20, "rice": 10, "wheat": 10, "fishmeal": 10, "sunflower meal": 10, "limestone": 3, "premix": 5, "salt": 1, "dl_methionine": 1},
+        "Finisher (13+ weeks)": {"corn": 30, "soybean": 15, "rice": 15, "wheat": 15, "fishmeal": 5, "sunflower meal": 10, "limestone": 4, "premix": 5, "salt": 1, "dl_methionine": 1},
+        "Laying (16+ weeks)": {"corn": 35, "soybean": 20, "rice": 10, "wheat": 10, "fishmeal": 5, "sunflower meal": 10, "limestone": 8, "premix": 5, "salt": 1, "dl_methionine": 1}
     },
     "Free-range": {
-        "0-6 weeks": {"corn": 35, "soybean": 25, "fishmeal": 20},
-        "7-16 weeks": {"corn": 40, "soybean": 30, "fishmeal": 20},
-        "17+ weeks": {"corn": 45, "soybean": 30, "fishmeal": 25}
+        "Starter (0-4 weeks)": {"corn": 40, "soybean": 25, "rice": 5, "wheat": 5, "fishmeal": 10, "sunflower meal": 5, "limestone": 2, "premix": 5, "salt": 1, "dl_methionine": 1},
+        "Grower (5-12 weeks)": {"corn": 35, "soybean": 20, "rice": 10, "wheat": 10, "fishmeal": 10, "sunflower meal": 10, "limestone": 3, "premix": 5, "salt": 1, "dl_methionine": 1},
+        "Finisher (13+ weeks)": {"corn": 30, "soybean": 15, "rice": 15, "wheat": 15, "fishmeal": 5, "sunflower meal": 10, "limestone": 4, "premix": 5, "salt": 1, "dl_methionine": 1},
+        "Laying (16+ weeks)": {"corn": 35, "soybean": 20, "rice": 10, "wheat": 10, "fishmeal": 5, "sunflower meal": 10, "limestone": 8, "premix": 5, "salt": 1, "dl_methionine": 1}
     }
 }
 
-# Suggested alternative ingredients
-alternative_ingredients = {
-    "fishmeal": ["sunflower meal", "rice"],
-    "soybean": ["wheat", "sunflower meal"],
-    "corn": ["wheat", "barley"]
-}
-
-# Full list of chicken breeds (optional)
-chicken_breeds = [
-    "Ancona", "Andalusian", "Appenzeller Barthuhner", "Appenzeller Spitzhauben", "Araucana", "Asil (Aseel)",
-    "Australorp", "Barbu d'Anvers", "Barbu d'Everberg", "Barbu d'Uccle", "Barbu de Grubbe", "Barbu de Watermael",
-    "Barnevelder", "Belgian Game", "Booted Bantam", "Brabanter", "Brahma", "Brakel", "Buckeye", "Campine",
-    "Carlisle Old English Game", "Cochin", "Cream Legbar", "Crèvecoeur", "Croad Langshan", "Dandarawi",
-    "Denizli", "Derbyshire Redcap", "Dominique", "Dorking", "Dutch Bantam", "Faverolles", "Fayoumi",
-    "Friesian", "Frizzle", "German Langshan", "Hamburgh", "Houdan", "Indian Game", "Italiener", "Ixworth",
-    "Japanese Bantam", "Jersey Giant", "Ko Shamo", "Kraienköppe", "La Bresse", "La Flèche", "Lakenvelder",
-    "Legbar", "Leghorn", "Malay", "Malines", "Marans", "Marsh Daisy", "Minorca", "Modern Game",
-    "Modern Langshan", "Nankin", "Nankin Shamo", "Neiderrheiner", "Netherlands Owlbeard", "New Hampshire Red",
-    "Norfolk Grey", "North Holland Blue", "Ohiki", "Old English Game Bantam", "Old English Pheasant Fowl",
-    "Orloff", "Orpington", "Oxford Old English Game", "Pekin", "Penedesenca", "Plymouth Rock", "Poland",
-    "Rhode Island Red", "Rhodebar", "Rosecomb", "Rumpless Araucana", "Rumpless Game", "Scots Dumpy",
-    "Scots Grey", "Sebright", "Serama", "Shamo", "Sicilian Buttercup", "Silkie", "Spanish", "Sulmtaler",
-    "Sultan", "Sumatra", "Sussex", "Taiwan", "Thai Game", "Thüringian", "Transylvanian Naked Neck",
-    "Tuzo", "Vorwerk", "Welbar", "Welsummer", "Wyandotte", "Wybar", "Yamato-Gunkei", "Yokohama"
-]
-
-# Get world currencies
+available_ingredients = list(next(iter(next(iter(feed_data.values())).values())).keys())
 currencies = sorted([currency.alpha_3 for currency in pycountry.currencies])
 
-# Streamlit UI
+# UI
 st.title("🐔 Chicken Feed Calculator")
-st.write("Easily calculate the best feed mix for your chickens!")
+st.markdown("**Rosashi Farms** - Helping farmers feed smarter.")
 
 currency = st.selectbox("Select your currency:", currencies)
 chicken_type = st.selectbox("Select type of chickens:", list(feed_data.keys()))
-optional_breed = st.selectbox("Optional: Select specific breed (if known):", ["None"] + chicken_breeds)
-age_group = st.selectbox("Select the age group of your chickens:", list(feed_data[chicken_type].keys()))
-total_chickens = st.number_input("Enter the number of chickens:", min_value=1, step=1)
+age_group = st.selectbox("Select age group:", list(feed_data[chicken_type].keys()))
+total_chickens = st.number_input("Number of chickens:", min_value=1, step=1)
 
-st.subheader("Enter price per 50KG bag (optional):")
 ingredient_prices = {}
-available_ingredients = ["corn", "soybean", "fishmeal", "wheat", "sunflower meal", "rice"]
-for ingredient in available_ingredients:
-    ingredient_prices[ingredient] = st.number_input(f"{ingredient.capitalize()} ({currency})", min_value=0.0, step=0.5, value=0.0)
+st.subheader("Ingredient Prices per 50KG Bag:")
+for ing in available_ingredients:
+    ingredient_prices[ing] = st.number_input(f"{ing.capitalize()} ({currency})", min_value=0.0, step=0.5)
 
-st.subheader("Select available feed ingredients:")
-selected_ingredients = st.multiselect("Choose from the list:", available_ingredients, default=["corn", "soybean", "fishmeal"])
+st.subheader("Available Ingredients:")
+selected_ingredients = st.multiselect("Select ingredients available to you:", available_ingredients, default=available_ingredients)
 
-# Feed calculation function
-def calculate_feed(total_chickens, chicken_type, age_group, selected_ingredients):
-    base_feed = feed_data.get(chicken_type, {}).get(age_group, {})
-    if not base_feed:
-        return None, []
-    adjusted_feed = {}
-    missing_ingredients = []
-    for ingredient, amount in base_feed.items():
-        if ingredient in selected_ingredients:
-            adjusted_feed[ingredient] = amount * total_chickens
-        else:
-            missing_ingredients.append((ingredient, alternative_ingredients.get(ingredient, [])))
-    return adjusted_feed, missing_ingredients
+def calculate_feed():
+    base = feed_data[chicken_type][age_group]
+    adjusted = {k: v * total_chickens for k, v in base.items() if k in selected_ingredients}
+    return adjusted
 
-# Generate feeding schedule as DataFrame
-def generate_feeding_schedule(chicken_type, feed_plan, days_to_maturity):
-    data = []
-    for day in range(1, days_to_maturity + 1):
-        daily_feed = {"Day": day}
-        for ingredient, total_grams in feed_plan.items():
-            daily_feed[ingredient] = total_grams
-        data.append(daily_feed)
-    return pd.DataFrame(data)
+def generate_chart(feed_dict):
+    fig, ax = plt.subplots()
+    ax.pie(feed_dict.values(), labels=feed_dict.keys(), autopct='%1.1f%%')
+    ax.set_title("Feed Composition")
+    return fig
 
-# Download helper
-def convert_df_to_csv(df):
-    return df.to_csv(index=False).encode('utf-8')
+def generate_pdf(feed_dict):
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(40, 750, "Rosashi Farms - Feed Recipe Report")
+    c.setFont("Helvetica", 12)
+    y = 720
+    for k, v in feed_dict.items():
+        c.drawString(40, y, f"{k.capitalize()}: {v} grams")
+        y -= 20
+    c.save()
+    buffer.seek(0)
+    return buffer
 
-def convert_df_to_excel(df):
+def to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Feeding Schedule')
+        df.to_excel(writer, index=False)
     return output.getvalue()
 
-# Display results
 if st.button("Calculate Feed"):
-    feed_needed, missing_ingredients = calculate_feed(total_chickens, chicken_type, age_group, selected_ingredients)
-    if feed_needed:
-        st.subheader(f"Feed requirement for {total_chickens} {chicken_type} chickens ({age_group}):")
-        for ingredient, amount in feed_needed.items():
-            st.write(f"- {ingredient}: {amount} grams per day")
+    feed = calculate_feed()
+    st.subheader("Feed Requirement (grams/day):")
+    for k, v in feed.items():
+        st.write(f"- {k}: {v:.1f}g")
+    
+    st.subheader("📊 Feed Composition Chart")
+    st.pyplot(generate_chart(feed))
 
-        total_weight = sum(feed_needed.values())
-        st.subheader("🐓 Recommended Feed Mixing Recipe:")
-        for ingredient, amount in feed_needed.items():
-            percentage = (amount / total_weight) * 100
-            st.write(f"- {ingredient}: {percentage:.1f}% of total feed mix")
+    total_cost = 0
+    st.subheader("💰 Estimated Daily Cost:")
+    for k, v in feed.items():
+        price_per_kg = ingredient_prices[k] / 50 if ingredient_prices[k] else 0
+        cost = (v / 1000) * price_per_kg
+        total_cost += cost
+        st.write(f"- {k}: {cost:.2f} {currency}")
+    st.write(f"**Total:** {total_cost:.2f} {currency}")
 
-        st.subheader("💰 Estimated Cost:")
-        total_cost = 0
-        for ingredient, amount in feed_needed.items():
-            price_per_kg = ingredient_prices[ingredient] / 50 if ingredient_prices[ingredient] > 0 else 0
-            kg_needed = amount / 1000
-            cost = kg_needed * price_per_kg
-            total_cost += cost
-            st.write(f"- {ingredient}: {cost:.2f} {currency}")
-        st.write(f"**Total Estimated Daily Cost:** {total_cost:.2f} {currency}")
+    df = pd.DataFrame([feed])
+    st.download_button("📥 Download as Excel", data=to_excel(df), file_name="rosashi_feed_plan.xlsx")
+    pdf_file = generate_pdf(feed)
+    st.download_button("📄 Download PDF Report", data=pdf_file, file_name="rosashi_feed_plan.pdf")
 
-        st.subheader("📦 Feed Duration:")
-        for ingredient, amount in feed_needed.items():
-            kg_total = 50
-            kg_per_day = amount / 1000
-            days = kg_total / kg_per_day if kg_per_day > 0 else 0
-            st.write(f"- {ingredient}: {days:.1f} days (50KG bag)")
-
-        st.subheader("📅 Total Feed Until Maturity:")
-        days_to_maturity = 75 if chicken_type == "Broilers" else 140
-        st.write(f"Estimated days to maturity: {days_to_maturity} days")
-        for ingredient, amount in feed_needed.items():
-            total_amount = (amount * days_to_maturity) / 1000
-            st.write(f"- {ingredient}: {total_amount:.1f} KG total needed")
-
-        st.subheader("📄 Download Feeding Schedule:")
-        schedule_df = generate_feeding_schedule(chicken_type, feed_needed, days_to_maturity)
-        csv = convert_df_to_csv(schedule_df)
-        excel = convert_df_to_excel(schedule_df)
-        st.download_button("Download as CSV", csv, "feeding_schedule.csv", "text/csv")
-        st.download_button("Download as Excel", excel, "feeding_schedule.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-    else:
-        st.error("No valid feed recipe found. Try selecting different ingredients.")
-
-    if missing_ingredients:
-        st.subheader("⚠️ Missing Ingredients & Suggestions:")
-        for missing, alternatives in missing_ingredients:
-            alt_list = ", ".join(alternatives) if alternatives else "No suggestions available"
-            st.write(f"- {missing}: Suggested alternatives: {alt_list}")
+    st.subheader("🖨️ Print Feed Plan")
+    st.markdown('<script>window.print()</script>', unsafe_allow_html=True)
