@@ -645,6 +645,14 @@ if "w_days" not in st.session_state:
     st.session_state.w_days = 30
 if "w_group_name" not in st.session_state:
     st.session_state.w_group_name = "My group"
+if "s_currency" not in st.session_state:
+    st.session_state.s_currency = "ZMW"
+if "s_bag_size" not in st.session_state:
+    st.session_state.s_bag_size = 50.0
+if "s_default_days" not in st.session_state:
+    st.session_state.s_default_days = 30
+if "s_prices" not in st.session_state:
+    st.session_state.s_prices = {ing: 0.0 for ing in CUSTOM_INGREDIENTS}
 if "custom_ration" not in st.session_state:
     first_animal = next(iter(LIVESTOCK_DATA))
     first_stage = next(iter(LIVESTOCK_DATA[first_animal]["stages"]))
@@ -823,38 +831,36 @@ st.markdown(
     """
     <div class="farm-hero">
         <h1>🦆 Farm Feed Planner</h1>
-        <p>Make a feeding plan in 4 simple steps.</p>
+        <p>Make a feeding plan in 5 simple steps.</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
 
-# ---- Sidebar: keep simple ----
+# ---- Sidebar: just reset ----
 with st.sidebar:
-    st.header("⚙️ Settings")
-    currency_options = ["ZMW", "USD", "GBP", "EUR", "ZAR", "KES", "TZS", "UGX"]
-    other = [c for c in get_currencies() if c not in currency_options]
-    currency = st.selectbox("Currency", currency_options + other, index=0)
-    bag_size = st.number_input("Bag size (kg)", min_value=1.0, value=50.0, step=1.0)
-    default_days = st.number_input("Default plan length (days)", min_value=1, value=30, step=1)
-
-    st.divider()
-    with st.expander("💰 Feed Prices (optional)"):
-        st.caption("Fill in only the ingredients you buy. Leave others at 0.")
-        prices = {}
-        for ingredient in CUSTOM_INGREDIENTS:
-            prices[ingredient] = st.number_input(
-                f"{ingredient.title()} per bag",
-                min_value=0.0, step=1.0, key=f"price_{ingredient}",
-            )
-
+    st.header("Menu")
+    st.markdown(
+        f"**Currency:** {st.session_state.s_currency}  \n"
+        f"**Bag size:** {st.session_state.s_bag_size:.0f} kg  \n"
+        f"**Default days:** {st.session_state.s_default_days}"
+    )
     st.divider()
     if st.button("🔄 Start Over", use_container_width=True):
         st.session_state.step = 1
         st.session_state.w_animal = None
         st.session_state.w_stage = None
         st.rerun()
+    if st.button("💰 Edit Finance / Costs", use_container_width=True):
+        st.session_state.step = 2
+        st.rerun()
+
+# Active values used by all steps
+currency = st.session_state.s_currency
+bag_size = st.session_state.s_bag_size
+default_days = st.session_state.s_default_days
+prices = st.session_state.s_prices
 
 
 # ---- Tabs ----
@@ -862,7 +868,7 @@ tab_plan, tab_farm, tab_reference = st.tabs(["📋 Quick Plan", "🚜 My Farm Pl
 
 
 def render_step_bar(current):
-    labels = ["1. Animal", "2. Age / Type", "3. How Many", "4. Your Plan"]
+    labels = ["1. Animal", "2. Finance", "3. Age / Type", "4. How Many", "5. Your Plan"]
     pills = []
     for i, label in enumerate(labels, start=1):
         cls = "active" if i == current else ("done" if i < current else "")
@@ -889,12 +895,79 @@ with tab_plan:
                     st.session_state.step = 2
                     st.rerun()
 
-    # ---- STEP 2: Stage ----
+    # ---- STEP 2: Finance / Costs ----
     elif st.session_state.step == 2:
         animal = st.session_state.w_animal
         emoji = ANIMAL_EMOJI.get(animal, "🐾")
+        if animal:
+            st.markdown(
+                f'<div class="picked">Selected: {emoji} {animal}</div>',
+                unsafe_allow_html=True,
+            )
+        st.subheader("Step 2 — Finance / Costs")
+        st.markdown(
+            "<div class='small-note'>Set your money and bag details. "
+            "Feed prices are optional — fill in only the ones you buy.</div>",
+            unsafe_allow_html=True,
+        )
+
+        currency_options = ["ZMW", "USD", "GBP", "EUR", "ZAR", "KES", "TZS", "UGX"]
+        other = [c for c in get_currencies() if c not in currency_options]
+        all_currencies = currency_options + other
+        current_currency_idx = all_currencies.index(st.session_state.s_currency) \
+            if st.session_state.s_currency in all_currencies else 0
+
+        f1, f2, f3 = st.columns(3)
+        with f1:
+            new_currency = st.selectbox("Currency", all_currencies, index=current_currency_idx)
+        with f2:
+            new_bag = st.number_input(
+                "Bag size (kg)", min_value=1.0,
+                value=float(st.session_state.s_bag_size), step=1.0,
+            )
+        with f3:
+            new_default_days = st.number_input(
+                "Default plan length (days)", min_value=1,
+                value=int(st.session_state.s_default_days), step=1,
+            )
+
+        st.markdown("### 💰 Feed Prices (optional)")
+        st.caption("Per bag price for each ingredient you buy. Leave at 0 to skip.")
+        new_prices = {}
+        cols = st.columns(2)
+        for i, ingredient in enumerate(CUSTOM_INGREDIENTS):
+            with cols[i % 2]:
+                new_prices[ingredient] = st.number_input(
+                    f"{ingredient.title()} per bag",
+                    min_value=0.0, step=1.0,
+                    value=float(st.session_state.s_prices.get(ingredient, 0.0)),
+                    key=f"price_{ingredient}",
+                )
+
+        st.markdown("---")
+        b1, b2 = st.columns([0.35, 0.65])
+        if b1.button("⬅️  Back", key="back_to_1"):
+            st.session_state.s_currency = new_currency
+            st.session_state.s_bag_size = float(new_bag)
+            st.session_state.s_default_days = int(new_default_days)
+            st.session_state.s_prices = new_prices
+            st.session_state.step = 1
+            st.rerun()
+        if b2.button("Continue  ➡️", key="to_step_3", type="primary", use_container_width=True):
+            st.session_state.s_currency = new_currency
+            st.session_state.s_bag_size = float(new_bag)
+            st.session_state.s_default_days = int(new_default_days)
+            st.session_state.s_prices = new_prices
+            st.session_state.w_days = int(new_default_days)
+            st.session_state.step = 3
+            st.rerun()
+
+    # ---- STEP 3: Stage ----
+    elif st.session_state.step == 3:
+        animal = st.session_state.w_animal
+        emoji = ANIMAL_EMOJI.get(animal, "🐾")
         st.markdown(f'<div class="picked">Selected: {emoji} {animal}</div>', unsafe_allow_html=True)
-        st.subheader("Step 2 — Choose age or type")
+        st.subheader("Step 3 — Choose age or type")
         st.markdown("Tap the option that matches your animals.")
 
         stages = list(LIVESTOCK_DATA[animal]["stages"].keys())
@@ -903,16 +976,16 @@ with tab_plan:
             label = f"**{stage}**  —  {data['daily_kg']} kg per {LIVESTOCK_DATA[animal]['unit']} per day"
             if st.button(label, key=f"stage_{stage}", use_container_width=True):
                 st.session_state.w_stage = stage
-                st.session_state.step = 3
+                st.session_state.step = 4
                 st.rerun()
 
         st.markdown("---")
-        if st.button("⬅️  Back", key="back_to_1"):
-            st.session_state.step = 1
+        if st.button("⬅️  Back", key="back_to_2"):
+            st.session_state.step = 2
             st.rerun()
 
-    # ---- STEP 3: Count + Days ----
-    elif st.session_state.step == 3:
+    # ---- STEP 4: Count + Days ----
+    elif st.session_state.step == 4:
         animal = st.session_state.w_animal
         stage = st.session_state.w_stage
         emoji = ANIMAL_EMOJI.get(animal, "🐾")
@@ -921,7 +994,7 @@ with tab_plan:
             f'<div class="picked">Selected: {emoji} {animal} — {stage}</div>',
             unsafe_allow_html=True,
         )
-        st.subheader("Step 3 — How many and how long?")
+        st.subheader("Step 4 — How many and how long?")
 
         c1, c2 = st.columns(2)
         with c1:
@@ -946,15 +1019,15 @@ with tab_plan:
 
         st.markdown("---")
         b1, b2 = st.columns([0.4, 0.6])
-        if b1.button("⬅️  Back", key="back_to_2"):
-            st.session_state.step = 2
+        if b1.button("⬅️  Back", key="back_to_3"):
+            st.session_state.step = 3
             st.rerun()
-        if b2.button("See My Plan  ➡️", key="to_step_4", type="primary", use_container_width=True):
-            st.session_state.step = 4
+        if b2.button("See My Plan  ➡️", key="to_step_5", type="primary", use_container_width=True):
+            st.session_state.step = 5
             st.rerun()
 
-    # ---- STEP 4: Results ----
-    elif st.session_state.step == 4:
+    # ---- STEP 5: Results ----
+    elif st.session_state.step == 5:
         animal = st.session_state.w_animal
         stage = st.session_state.w_stage
         count = int(st.session_state.w_count)
@@ -1100,8 +1173,8 @@ with tab_plan:
 
         st.markdown("---")
         b1, b2, b3 = st.columns([0.33, 0.34, 0.33])
-        if b1.button("⬅️  Back", key="back_to_3"):
-            st.session_state.step = 3
+        if b1.button("⬅️  Back", key="back_to_4"):
+            st.session_state.step = 4
             st.rerun()
         if b2.button("➕ Add to My Farm Plan", type="primary", use_container_width=True):
             st.session_state.farm_groups.append({
