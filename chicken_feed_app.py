@@ -763,9 +763,31 @@ st.markdown(
     }
     .stTabs [data-baseweb="tab"] {
         border-radius: 8px; padding: 0.6rem 1.2rem;
-        font-weight: 600; font-size: 1.05rem;
+        font-weight: 700; font-size: 1.05rem;
+        color: #2c5e3f !important;
+    }
+    .stTabs [data-baseweb="tab"] p {
+        color: #2c5e3f !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
     }
     .stTabs [aria-selected="true"] { background: #3f7d58 !important; color: white !important; }
+    .stTabs [aria-selected="true"] p { color: #ffffff !important; }
+
+    /* Expander header readable */
+    .stExpander summary, .stExpander summary p,
+    details summary, details summary p {
+        color: #2c5e3f !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+    }
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary p,
+    [data-testid="stExpander"] summary span,
+    [data-testid="stExpander"] summary div {
+        color: #2c5e3f !important;
+        font-weight: 700 !important;
+    }
 
     /* Note card */
     .small-note {
