@@ -9,7 +9,7 @@ from reportlab.pdfgen import canvas
 
 
 st.set_page_config(
-    page_title="Farm Feed Planner",
+    page_title="Rosashi Farms Livestock Feed Planner",
     page_icon="🦆",
     layout="wide",
 )
@@ -830,7 +830,7 @@ st.markdown(
 st.markdown(
     """
     <div class="farm-hero">
-        <h1>🦆 Farm Feed Planner</h1>
+        <h1>🦆 Rosashi Farms Livestock Feed Planner</h1>
         <p>Make a feeding plan in 5 simple steps.</p>
     </div>
     """,
